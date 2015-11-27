@@ -3,6 +3,7 @@
 namespace Rottenwood\KingdomBundle\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use Rottenwood\KingdomBundle\Entity\Infrastructure\RoomType;
 
 /**
  * Игровая локация
@@ -10,6 +11,8 @@ use Doctrine\ORM\Mapping as ORM;
  * @ORM\Entity(repositoryClass="Rottenwood\KingdomBundle\Entity\Infrastructure\RoomRepository")
  */
 class Room {
+
+    const DEFAULT_Z = 0;
 
     /**
      * @ORM\Column(name="id", type="integer")
@@ -28,7 +31,7 @@ class Room {
 
     /**
      * Тип
-     * @ORM\ManyToOne(targetEntity="RoomType")
+     * @ORM\ManyToOne(targetEntity="Rottenwood\KingdomBundle\Entity\Infrastructure\RoomType")
      * @ORM\JoinColumn(name="type", referencedColumnName="id")
      * @var RoomType
      **/
@@ -68,7 +71,7 @@ class Room {
      * @param RoomType $type
      * @param int      $z
      */
-    public function __construct($x, $y, RoomType $type, $z = 0) {
+    public function __construct($x, $y, RoomType $type, $z = self::DEFAULT_Z) {
         $this->x = $x;
         $this->y = $y;
         $this->type = $type;
@@ -86,7 +89,7 @@ class Room {
      * @return string
      */
     public function getName() {
-        return $this->name;
+        return $this->name ?: $this->getType()->getName();
     }
 
     /**
@@ -97,10 +100,17 @@ class Room {
     }
 
     /**
+     * @param RoomType $type
+     */
+    public function setType(RoomType $type) {
+        $this->type = $type;
+    }
+
+    /**
      * @return string
      */
     public function getDescription() {
-        return $this->description;
+        return $this->description ?: $this->getType()->getDescription();
     }
 
     /**

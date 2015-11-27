@@ -1,7 +1,18 @@
 services:
-    # Слушатель событий FOSUserBundle
-    fosuser.listener:
-        class: "Rottenwood\UserBundle\EventListener\FOSUserListener"
-        arguments: [@router, @kernel, @kingdom.room_repository]
-        tags:
-            - { name: kernel.event_subscriber }
+    # Логгеры
+    user.logger_formatter:
+        class: Monolog\Formatter\LineFormatter
+        arguments:
+            - "[%%datetime%%] %%message%%\n"
+
+    user.logger.registration:
+        class: Rottenwood\UserBundle\Loggers\RegistrationLogger
+        arguments: ['default']
+        calls:
+          - ['pushHandler', [@user.logger_handler.registration]]
+
+    user.logger_handler.registration:
+        class: Monolog\Handler\StreamHandler
+        arguments: [ "%kernel.logs_dir%/game_logs/registrations.log"]
+        calls:
+          - ['setFormatter', [@user.logger_formatter]]

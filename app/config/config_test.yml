@@ -1,6 +1,10 @@
 imports:
     - { resource: config_dev.yml }
 
+parameters:
+    # Параметры для докера
+    database_name:          kingdom_test
+
 framework:
     test: ~
     session:

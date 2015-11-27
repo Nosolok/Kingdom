@@ -1,0 +1,18 @@
+{
+    "websocketPort": 7777,
+    "commandChannelName": "command",
+    "systemChannelName": "system",
+    "gateChannelName": "gate",
+    "logChannel": "logger",
+
+    "symfonyConsoleEntryPoint": "/kingdom/app/console kingdom:execute",
+    "symfonyConsoleLogCommand": "/kingdom/app/console kingdom:node:log",
+
+    "redisIdUsernameHash": "kingdom:users:usernames",
+    "redisSessionIdHash": "kingdom:sessions:users",
+    "redisOnlineList": "kingdom:users:online",
+    "redisIdSessionHash": "kingdom:users:sessions",
+    "redisIdRoomHash": "kingdom:users:rooms",
+
+    "secondsToAdvice": 1800
+}

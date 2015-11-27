@@ -3,51 +3,86 @@
 echo "Настройка для доступа www-data к внешним файлам ..."
 usermod -u 1000 www-data
 
-echo "Копирование конфигов для nginx ..."
-cp -r /kingdom/app/docker/nginx /etc
+echo "Копирование конфигов ..."
+cp -r /kingdom/app/docker/etc /
 
-echo "Конфигурация Symfony-окружения: $SYMFONY_ENVIRONMENT ..."
+echo "Подключение страницы с информацией о загрузке ..."
+ln -s /etc/nginx/sites-available/maintain.conf /etc/nginx/sites-enabled/
 
-if [ ${SYMFONY_ENVIRONMENT} = "dev" ]; then
-    ln -s /etc/nginx/sites-available/kingdom-dev.conf /etc/nginx/sites-enabled/
-    rm /kingdom/web/app_dev.php
-    cp /kingdom/app/docker/symfony/app_dev.php /kingdom/web/
-    mv /etc/nginx/nginx-dev.conf /etc/nginx/nginx.conf
-else
-    rm /kingdom/web/app_dev.php
-    ln -s /etc/nginx/sites-available/kingdom.conf /etc/nginx/sites-enabled/
-    rm /etc/nginx/nginx-dev.conf
-fi
+echo "Запуск nginx ..."
+/etc/init.d/nginx start
 
 echo "Обновление библиотек композера ..."
-[ -d /kingdom/vendor ] || mkdir /kingdom/vendor
-sudo -u www-data /composer.phar install -n -d /kingdom/
+sudo /composer.phar install -n -d /kingdom/
+sudo chown -R www-data:www-data /kingdom/vendor /kingdom/bin /kingdom/app/cache /kingdom/app/logs
+
+echo "Очистка кэша ..."
+rm -rf /kingdom/app/cache/dev /kingdom/app/cache/prod /kingdom/app/logs/dev.log /kingdom/app/logs/prod.log
 
 echo "Создание БД, при ее отсутствии ..."
-/kingdom/app/console doctrine:database:create > /dev/null 2>&1
+sudo -u www-data /kingdom/app/console doctrine:database:create -e $SYMFONY_ENVIRONMENT > /dev/null 2>&1
 
 echo "Обновление структуры БД ..."
-/kingdom/app/console doctrine:schema:update --force
+sudo -u www-data /kingdom/app/console doctrine:schema:update -e $SYMFONY_ENVIRONMENT --force
 
 echo "Загрузка игровых данных в БД ..."
-/kingdom/app/console kingdom:map:create
-/kingdom/app/console kingdom:items:create
+sudo -u www-data /kingdom/app/console kingdom:create:map -e $SYMFONY_ENVIRONMENT
 
 echo "Инициализация серверов ..."
 /etc/init.d/php5-fpm start
 /etc/init.d/redis-server start
 /etc/init.d/nginx start
 
+echo "Установка npm пакетов ..."
+cd /kingdom
+npm install
+
 echo "Сборка CSS и JS ассетов ..."
-cd /kingdom && node node_modules/gulp/bin/gulp.js build
+node node_modules/gulp/bin/gulp.js build
 
 echo "Очистка кэша ..."
 rm -rf /kingdom/app/cache/dev /kingdom/app/cache/prod /kingdom/app/logs/dev.log /kingdom/app/logs/prod.log
 
 if [ ${SYMFONY_ENVIRONMENT} = "prod" ]; then
-    sudo -u www-data /kingdom/app/console cache:warm -e prod
+    /kingdom/app/console cache:warm -e prod
+else
+    /kingdom/app/console kingdom:create:user test test test@test.ru -e $SYMFONY_ENVIRONMENT
+    /kingdom/app/console kingdom:create:items -e $SYMFONY_ENVIRONMENT
 fi
+
+echo "Настройка прав на логи"
+chown -R www-data /kingdom/app/logs
+
+echo "Очистка кэша ..."
+rm -rf /kingdom/app/cache/dev /kingdom/app/cache/prod /kingdom/app/logs/dev.log /kingdom/app/logs/prod.log
+
+echo "Конфигурация Symfony-окружения: $SYMFONY_ENVIRONMENT ..."
+rm /kingdom/web/app_dev.php
+
+if [ ${SYMFONY_ENVIRONMENT} = "prod" ] ; then
+    ln -s /etc/nginx/sites-available/kingdom.conf /etc/nginx/sites-enabled/
+    rm /etc/nginx/nginx-dev.conf
+else
+    ln -s /etc/nginx/sites-available/kingdom-dev.conf /etc/nginx/sites-enabled/
+    cp /kingdom/app/docker/symfony/app_dev.php /kingdom/web/
+    mv /etc/nginx/nginx-dev.conf /etc/nginx/nginx.conf
+
+    echo "Включение модуля xdebug"
+    sudo php5enmod xdebug
+
+    echo "Рестарт php5-fpm ..."
+    sudo service php5-fpm restart
+fi
+
+echo "Отключение страницы с информацией о загрузке ..."
+rm /etc/nginx/sites-enabled/maintain.conf
+
+
+echo "Рестарт nginx ..."
+sudo service nginx restart
 
 echo "Запуск node.js приложений ..."
 cd /kingdom/websocket
-(node router.js &) && node gate.js
+node router.js &
+node ticker.js &
+node gate.js

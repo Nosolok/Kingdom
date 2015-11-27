@@ -4,12 +4,17 @@ namespace Rottenwood\KingdomBundle\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
 use Rottenwood\KingdomBundle\Entity\Infrastructure\Item;
+use Rottenwood\KingdomBundle\Entity\Infrastructure\User;
+use Rottenwood\KingdomBundle\Exception\WrongSlot;
 
 /**
  * Предмет в инвентаре персонажа
  * @ORM\Table(
  *      name="users_items",
- *      uniqueConstraints={@ORM\UniqueConstraint(name="inventory_user_item", columns={"user_id", "item_id"})}
+ *      uniqueConstraints={
+ *          @ORM\UniqueConstraint(name="inventory_user_item", columns={"user_id", "item_id"}),
+ *          @ORM\UniqueConstraint(name="inventory_user_slot", columns={"user_id", "slot"})
+ *      }
  * )
  * @ORM\Entity(repositoryClass="Rottenwood\KingdomBundle\Entity\Infrastructure\InventoryItemRepository")
  */
@@ -25,7 +30,7 @@ class InventoryItem {
 
     /**
      * Персонаж
-     * @ORM\ManyToOne(targetEntity="Rottenwood\KingdomBundle\Entity\User")
+     * @ORM\ManyToOne(targetEntity="Rottenwood\KingdomBundle\Entity\Infrastructure\User")
      * @ORM\JoinColumn(name="user_id", referencedColumnName="id", nullable=false)
      * @var User
      */
@@ -45,6 +50,13 @@ class InventoryItem {
      * @ORM\Column(name="quantity", type="integer")
      */
     private $quantity;
+
+    /**
+     * Слот, в который одет предмет
+     * @ORM\Column(name="slot", type="string", length=50, nullable=true)
+     * @var string
+     */
+    private $slot;
 
     /**
      * @param User $user
@@ -90,5 +102,31 @@ class InventoryItem {
      */
     public function setQuantity($quantity) {
         $this->quantity = $quantity;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSlot() {
+        return $this->slot;
+    }
+
+    /**
+     * @param string $slot
+     * @throws WrongSlot
+     */
+    public function setSlot($slot) {
+        if (in_array($slot, Item::getAllSlotNames())) {
+            $this->slot = $slot;
+        } else {
+            throw new WrongSlot($slot);
+        }
+    }
+
+    /**
+     * Удаление предмета из слота
+     */
+    public function removeSlot() {
+        $this->slot = null;
     }
 }

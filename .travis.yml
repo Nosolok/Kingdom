@@ -1,0 +1,17 @@
+language: php
+
+php:
+  - 5.5
+
+sudo: required
+
+services:
+    - docker
+
+install:
+    - ./kingdom.sh start test
+    - sleep 80
+    - ./kingdom.sh log
+
+script:
+    - ./kingdom.sh test

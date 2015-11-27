@@ -4,11 +4,12 @@ namespace Rottenwood\KingdomBundle\Controller;
 
 use Rottenwood\KingdomBundle\Entity\User;
 use Rottenwood\KingdomBundle\Redis\RedisClientInterface;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\Security;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+
+use Sensio\Bundle\FrameworkExtraBundle\Configuration\Security;
+use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 
 class DefaultController extends Controller {
 
@@ -36,20 +37,39 @@ class DefaultController extends Controller {
         $sessionId = $request->getSession()->getId();
         /** @var User $user */
         $user = $this->getUser();
-        $userId =  $user->getId();
+        $userId = $user->getId();
 
-        /** @var RedisClientInterface $redis */
+        /** @var \Redis $redis */
         $redis = $this->container->get('snc_redis.default');
 
         $redis->hset(RedisClientInterface::ID_USERNAME_HASH, $userId, $user->getName());
         $redis->hset(RedisClientInterface::ID_SESSION_HASH, $userId, $sessionId);
         $redis->hset(RedisClientInterface::SESSION_ID_HASH, $sessionId, $userId);
+        $redis->hset(RedisClientInterface::ID_ROOM_HASH, $userId, $user->getRoom()->getId());
 
-        return $this->render(
-            'RottenwoodKingdomBundle:Default:game.html.twig',
-            [
-                'sessionId'    => $sessionId,
-            ]
-        );
+        return $this->render('RottenwoodKingdomBundle:Default:game.html.twig', ['sessionId' => $sessionId]);
+    }
+
+    /**
+     * Страница информации о персонаже
+     * @Route("/character/{name}", name="character_page")
+     * @param Request $request
+     * @return Response
+     */
+    public function characterPageAction(Request $request) {
+        $userNameOrId = $request->attributes->get('name');
+        $userRepository = $this->get('kingdom.user_repository');
+
+        $user = $userRepository->findByNameOrId($userNameOrId);
+
+        $result = [
+            'character' => $user,
+        ];
+
+        if ($user) {
+            $result['items'] = $this->get('kingdom.inventory_item_repository')->findByUser($user);
+        }
+
+        return $this->render('RottenwoodKingdomBundle:Default:character.html.twig', $result);
     }
 }

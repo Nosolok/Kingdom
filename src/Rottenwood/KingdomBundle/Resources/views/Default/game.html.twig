@@ -7,13 +7,18 @@
 {% block javascripts %}
     <script type="text/javascript">
         var sessionId = '{{ sessionId }}';
-        var websocketUrl = window.location.hostname;
     </script>
 
-    <script type="text/javascript" data-main="js/requireJs/main" src="{{ asset('js/lib/require-2.1.20.js') }}"></script>
+    <script type="text/javascript" src="{{ asset('js/libraries.js') }}"></script>
+    <script type="text/javascript" src="{{ asset('js/scripts.js') }}"></script>
 {% endblock javascripts %}
 
 {% block body %}
+    <div id="game-overlay"></div>
+    <div id="system-message">
+        <p>Внимание. Происходит обновление и перезагрузка игры</p>
+        <img src="{{ asset('img/web_elements/loading.gif') }}">
+    </div>
     <div id="game-underlayer"></div>
 
     <div id="game-inventory" class="noselect">
@@ -21,25 +26,51 @@
             <span>Инвентарь</span>
             <span class="close-button">❌</span>
         </div>
-        <div class="container"></div>
+
+        <div class="paperdoll">
+            <div>
+                <div class="empty"><img src="{{ asset('img/items/null.gif') }}" alt=""></div>
+                <div class="head slot nointeract" data-slot="head" data-img="{{ asset('img/items/helm.png') }}"><img src="{{ asset('img/items/helm.png') }}" alt=""></div>
+                <div class="cloak slot nointeract" data-slot="cloak" data-img="{{ asset('img/items/cloak.png') }}"><img src="{{ asset('img/items/cloak.png') }}" alt=""></div>
+            </div>
+            <div>
+                <div class="weapon slot nointeract" data-slot="weapon" data-img="{{ asset('img/items/weapon.png') }}"><img src="{{ asset('img/items/weapon.png') }}" alt=""></div>
+                <div class="body slot nointeract" data-slot="body" data-img="{{ asset('img/items/robe.png') }}"><img src="{{ asset('img/items/robe.png') }}" alt=""></div>
+                <div class="left_hand slot nointeract" data-slot="left_hand" data-img="{{ asset('img/items/shield.png') }}"><img src="{{ asset('img/items/shield.png') }}" alt=""></div>
+            </div>
+            <div>
+                <div class="gloves slot nointeract" data-slot="gloves" data-img="{{ asset('img/items/gloves.png') }}"><img src="{{ asset('img/items/gloves.png') }}" alt=""></div>
+                <div class="legs slot nointeract" data-slot="legs" data-img="{{ asset('img/items/legs.png') }}"><img src="{{ asset('img/items/legs.png') }}" alt=""></div>
+                <div class="ring_first slot ring nointeract" data-slot="ring_first" data-img="{{ asset('img/items/ring.png') }}"><img src="{{ asset('img/items/ring.png') }}" alt=""></div>
+            </div>
+            <div>
+                <div class="amulet slot nointeract" data-slot="amulet" data-img="{{ asset('img/items/amulet.png') }}"><img src="{{ asset('img/items/amulet.png') }}" alt=""></div>
+                <div class="boots slot nointeract" data-slot="boots" data-img="{{ asset('img/items/boots.png') }}"><img src="{{ asset('img/items/boots.png') }}" alt=""></div>
+                <div class="ring_second slot ring nointeract" data-slot="ring_second" data-img="{{ asset('img/items/ring.png') }}"><img src="{{ asset('img/items/ring.png') }}" alt=""></div>
+            </div>
+        </div>
+
+        <div class="money"></div>
+
+        <div class="items-list"></div>
     </div>
 
-    <div id="game-user-info" class="noselect" data-name="{{ app.user.name }}">
+    <div id="game-user-info" class="noselect" data-name="{{ app.user.name }}" data-avatar="{{ app.user.avatar }}">
         <div class="title">
             <span class="user-name">{{ app.user.name }}</span>
             <span class="close-button">❌</span>
         </div>
-        <div class="avatar"></div>
+        <div class="avatar"><img src="{{ app.user.avatar }}"></div>
     </div>
 
     <div id="game-room" class="noselect">
         <div class="room-name"></div>
-        <div class="room-description"></div>
+        <div class="room-content">
+            <div class="room-description"></div>
+            <div class="room-actions"></div>
+        </div>
+        <div class="room-resources-list"></div>
         <div class="room-players"></div>
-        {# TODO[Rottenwood]: Ссылка выхода из игры #}
-        {#| <a href="{{ path('fos_user_security_logout') }}">#}
-        {#{{ 'layout.logout'|trans({}, 'FOSUserBundle') }}#}
-        {#</a>#}
     </div>
 
     <div id="game-chat">
@@ -48,15 +79,28 @@
             <span class="players-online"></span>
         </div>
         <div>
-            Доска задач проекта: <a
-                    href="https://trello.com/b/dYc2L9lX/kingdom">https://trello.com/b/dYc2L9lX/kingdom</a>
+            Игра находится на стадии разработки. Пожалуйста, <a href="http://kingdom.reformal.ru" onclick="Reformal.widgetOpen();return false;" onmouseover="Reformal.widgetPreload();">оставьте свой отзыв или предложение</a>, или посмотрите на <a target="_blank" href="https://github.com/MagicGreenHat/Kingdom/issues">доску задач</a> проекта.<br><br>
+            <script type="text/javascript">
+                var reformalOptions = {
+                    project_id: 935464,
+                    show_tab: false,
+                    project_host: "kingdom.reformal.ru"
+                };
+
+                (function() {
+                    var script = document.createElement('script');
+                    script.type = 'text/javascript'; script.async = true;
+                    script.src = ('https:' == document.location.protocol ? 'https://' : 'http://') + 'media.reformal.ru/widgets/v3/reformal.js';
+                    document.getElementsByTagName('head')[0].appendChild(script);
+                })();
+            </script><noscript><a href="http://reformal.ru"><img src="http://media.reformal.ru/reformal.png" /></a><a href="http://kingdom.reformal.ru">Оставьте свой отзыв или предложение!</a></noscript>
         </div>
     </div>
 
     <div class="game-left-box noselect">
         <div id="game-map">
             <div class="map">
-                <div class="map-frame-line y5">
+                <div class="map-frame-line y5 nointeract">
                     <div class="map-frame x1">{{ emptyRoomImage }}</div>
                     <div class="map-frame x2">{{ emptyRoomImage }}</div>
                     <div class="map-frame x3">{{ emptyRoomImage }}</div>
@@ -64,27 +108,27 @@
                     <div class="map-frame x5">{{ emptyRoomImage }}</div>
                 </div>
                 <div class="map-frame-line y4">
-                    <div class="map-frame x1">{{ emptyRoomImage }}</div>
-                    <div class="map-frame x2">{{ emptyRoomImage }}</div>
+                    <div class="map-frame x1 nointeract">{{ emptyRoomImage }}</div>
+                    <div class="map-frame x2 nointeract">{{ emptyRoomImage }}</div>
                     <div class="map-frame x3 direction north" data-direction="north">{{ emptyRoomImage }}</div>
-                    <div class="map-frame x4">{{ emptyRoomImage }}</div>
-                    <div class="map-frame x5">{{ emptyRoomImage }}</div>
+                    <div class="map-frame x4 nointeract">{{ emptyRoomImage }}</div>
+                    <div class="map-frame x5 nointeract">{{ emptyRoomImage }}</div>
                 </div>
                 <div class="map-frame-line y3">
-                    <div class="map-frame x1">{{ emptyRoomImage }}</div>
+                    <div class="map-frame x1 nointeract">{{ emptyRoomImage }}</div>
                     <div class="map-frame x2 direction west" data-direction="west">{{ emptyRoomImage }}</div>
-                    <div class="map-frame-player"><img src="{{ asset('img/locations/character-male.png') }}"></div>
+                    <div class="map-frame-player nointeract"><img src="{{ asset('img/locations/character-male.png') }}"></div>
                     <div class="map-frame x4 direction east" data-direction="east">{{ emptyRoomImage }}</div>
-                    <div class="map-frame x5">{{ emptyRoomImage }}</div>
+                    <div class="map-frame x5 nointeract">{{ emptyRoomImage }}</div>
                 </div>
                 <div class="map-frame-line y2">
-                    <div class="map-frame x1">{{ emptyRoomImage }}</div>
-                    <div class="map-frame x2">{{ emptyRoomImage }}</div>
+                    <div class="map-frame x1 nointeract">{{ emptyRoomImage }}</div>
+                    <div class="map-frame x2 nointeract">{{ emptyRoomImage }}</div>
                     <div class="map-frame x3 direction south" data-direction="south">{{ emptyRoomImage }}</div>
-                    <div class="map-frame x4">{{ emptyRoomImage }}</div>
-                    <div class="map-frame x5">{{ emptyRoomImage }}</div>
+                    <div class="map-frame x4 nointeract">{{ emptyRoomImage }}</div>
+                    <div class="map-frame x5 nointeract">{{ emptyRoomImage }}</div>
                 </div>
-                <div class="map-frame-line y1">
+                <div class="map-frame-line y1 nointeract">
                     <div class="map-frame x1">{{ emptyRoomImage }}</div>
                     <div class="map-frame x2">{{ emptyRoomImage }}</div>
                     <div class="map-frame x3">{{ emptyRoomImage }}</div>

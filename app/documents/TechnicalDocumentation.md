@@ -10,8 +10,13 @@
 * Node.js 0.10.25
 * Symfony 2.7 [документация](https://symfony.com/doc/current/index.html)
 * Redis 2.8.4 [команды](http://redis.io/commands)
-* Docker 1.0 [руководство](http://docs.docker.com/mac/started/)
+* Docker 1.0 [руководство](http://docs.docker.com/linux/started/)
 * Autobahn.js 0.9.6 [документация](http://autobahn.ws/js/)
+* PHPUnit 4.8.16
+* Codeception 2.1.3
+
+## Запуск тестов
+* Приемочные, интеграционные и юнит тесты запускаются командой **kingdom.sh test**
 
 ## Ход работы приложения
 
@@ -37,9 +42,11 @@
 
 
 ## Структура директорий
-* app/
+* **kingdom.sh** -- Исполняемый файл для управления проектом
+
 * app/config -- Конфигурационные файлы фреймворка
 * app/Documents -- Файлы проектной документации
+* app/docker -- Конфигурационные файлы для настройки Docker контейнера
 
 * src/Rottenwood/UserBundle -- Расширение для FOSUserBundle
 * src/Rottenwood/UserBundle/Resources/views -- шаблоны для отображения страниц логина и регистрации
@@ -64,11 +71,30 @@
 * src/Rottenwood/KingdomBundle/Service -- Сервисы, не имеющие состояний
 * src/Rottenwood/KingdomBundle/Resources/views -- Twig-шаблоны страниц
 
+* node_modules -- Директория для внешних npm-пакетов. Пакеты нуждающиеся в компилляции добавляются в гит. Остальные устанавливаются отдельно
+
 * vendor/ -- Код сторонних библиотек, подгруженных композером
+
+* tests/ -- директория с тестами
+* tests/acceptance -- приемочные тесты, userstory
+* tests/functional -- интеграционные тесты, тестирующие комплексные процессы
+* tests/unit -- юнит-тесты для тестирования отдельных классов
+* tests/_output -- директория с логами тестера. Может пригодиться для отладки
+* tests/_output/_coverage -- директория в которой создается отчет о покрытии тестами
+
+### Frontend
+
 * web/ -- Файлы, доступные для запроса браузером: js, css, изображения 
 
+* frontend/namespace.js -- Конфигурация пространства имен (файл должен загружаться первым)
+* frontend/Model -- Модели. Классы, могут содержать логику обработки.
+* frontend/Controller -- Контроллеры, события и рендеринг страниц. У каждого условного блока пользовательского интерфейса должен быть свой контроллер, отвечающий за обработку блока и работу с моделями.
+* frontend/View -- Шаблоны для отрисовки HTML
+* web/js/lib -- Внешние библиотеки
+* web/js/src -- Старые исходники js-кода
+* web/js -- Файлы в данной директории (не во вложенных директориях) являются скомпиллированными.
+
 * src/Rottenwood/KingdomBundle/Resources/views/Default/game.html.twig -- Шаблон основной страницы игры
-* web/js/websocket/client.js -- Javascript-клиент для подключения к вебсокетам и обработки ответов сервера
 
 * websocket/ -- Серверы node.js для работы через вебсокеты
 * websocket/router.js -- Вебсокет сервер и роутер соединений

@@ -4,11 +4,11 @@ namespace Rottenwood\KingdomBundle\Command\Game;
 
 use Rottenwood\KingdomBundle\Command\Infrastructure\AbstractGameCommand;
 use Rottenwood\KingdomBundle\Command\Infrastructure\CommandResponse;
-use Rottenwood\KingdomBundle\Entity\User;
+use Rottenwood\KingdomBundle\Entity\Infrastructure\User;
 
 /**
  * Отображение игроков в текущей комнате
- * Применение в js: callCommand('showPlayersInRoom')
+ * Применение в js: Kingdom.Websocket.command('showPlayersInRoom')
  */
 class ShowPlayersInRoom extends AbstractGameCommand {
 
@@ -17,7 +17,7 @@ class ShowPlayersInRoom extends AbstractGameCommand {
      */
     public function execute() {
         $playersInRoom = array_map(
-            function (User $user) {
+            function(User $user) {
                 return [
                     'name'   => $user->getName(),
                     'stance' => 'стоит тут.',
@@ -29,9 +29,8 @@ class ShowPlayersInRoom extends AbstractGameCommand {
             )
         );
 
-        $response = new CommandResponse('showPlayersInRoom');
-        $response->setData($playersInRoom);
+        $this->result->setData($playersInRoom);
 
-        return $response;
+        return $this->result;
     }
 }

@@ -3,7 +3,7 @@ services:
         class: Rottenwood\KingdomBundle\Entity\Infrastructure\UserRepository
         factory_service: "doctrine.orm.entity_manager"
         factory_method: getRepository
-        arguments: ["Rottenwood\KingdomBundle\Entity\User"]
+        arguments: ["Rottenwood\KingdomBundle\Entity\Human"]
 
     kingdom.room_repository:
         class: Rottenwood\KingdomBundle\Entity\Infrastructure\RoomRepository
@@ -15,7 +15,7 @@ services:
         class: Rottenwood\KingdomBundle\Entity\Infrastructure\RoomTypeRepository
         factory_service: "doctrine.orm.entity_manager"
         factory_method: getRepository
-        arguments: ["Rottenwood\KingdomBundle\Entity\RoomType"]
+        arguments: ["Rottenwood\KingdomBundle\Entity\Infrastructure\RoomType"]
 
     kingdom.item_repository:
         class: Rottenwood\KingdomBundle\Entity\Infrastructure\ItemRepository
@@ -29,9 +29,63 @@ services:
         factory_method: getRepository
         arguments: ["Rottenwood\KingdomBundle\Entity\InventoryItem"]
 
+    kingdom.money_repository:
+        class: Rottenwood\KingdomBundle\Entity\Infrastructure\MoneyRepository
+        factory_service: "doctrine.orm.entity_manager"
+        factory_method: getRepository
+        arguments: ["Rottenwood\KingdomBundle\Entity\Money"]
+
+    kingdom.room_resource_repository:
+        class: Rottenwood\KingdomBundle\Entity\Infrastructure\RoomResourceRepository
+        factory_service: "doctrine.orm.entity_manager"
+        factory_method: getRepository
+        arguments: ["Rottenwood\KingdomBundle\Entity\RoomResource"]
+
     kingdom.user_service:
         class: Rottenwood\KingdomBundle\Service\UserService
         arguments:
+            - @kernel
             - @snc_redis.default
+            - @kingdom.logger
             - @kingdom.user_repository
             - @kingdom.inventory_item_repository
+            - @kingdom.room_repository
+            - @kingdom.item_repository
+
+    # Логгеры
+    kingdom.logger_formatter:
+        class: Monolog\Formatter\LineFormatter
+        arguments:
+            - "[%%datetime%%] %%message%%\n"
+
+    kingdom.logger_error_formatter:
+        class: Monolog\Formatter\LineFormatter
+        arguments:
+            - "[%%datetime%%] %%message%%\n %%context%%\n"
+        calls:
+            - [includeStacktraces]
+
+    kingdom.logger:
+        class: Monolog\Logger
+        arguments: ['default']
+        calls:
+          - ['pushHandler', [@kingdom.logger_handler.actions]]
+
+    kingdom.logger_handler.actions:
+        class: Monolog\Handler\StreamHandler
+        arguments: [ "%kernel.logs_dir%/game_logs/user_actions.log"]
+        calls:
+          - ['setFormatter', [@kingdom.logger_formatter]]
+
+    kingdom.logger.commands_errors:
+        class: Monolog\Logger
+        arguments: ['default']
+        calls:
+          - ['pushHandler', [@kingdom.logger_handler.errors]]
+
+    kingdom.logger_handler.errors:
+        class: Monolog\Handler\StreamHandler
+        arguments: [ "%kernel.logs_dir%/game_logs/errors.log"]
+        calls:
+          - ['setFormatter', [@kingdom.logger_error_formatter]]
+

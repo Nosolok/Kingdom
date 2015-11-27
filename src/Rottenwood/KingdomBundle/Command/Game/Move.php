@@ -6,10 +6,13 @@ use Rottenwood\KingdomBundle\Command\Infrastructure\AbstractGameCommand;
 use Rottenwood\KingdomBundle\Command\Infrastructure\CommandResponse;
 use Rottenwood\KingdomBundle\Entity\Room;
 use Rottenwood\KingdomBundle\Exception\InvalidCommandParameter;
+use Rottenwood\KingdomBundle\Redis\RedisClientInterface;
 
+/**
+ * Перемещение по карте
+ * Применение в js: Kingdom.Websocket.command('move', 'north|south|west|east')
+ */
 class Move extends AbstractGameCommand {
-
-    const DEFAULT_ROOM = 1;
 
     /**
      * @return CommandResponse
@@ -19,9 +22,11 @@ class Move extends AbstractGameCommand {
         $roomRepository = $this->container->get('kingdom.room_repository');
         $em = $roomRepository->getEntityManager();
 
-        //TODO[Rottenwood]: логировать ошибку если у пользователя нет комнаты
+        $userId = $this->user->getId();
+        $userName = $this->user->getName();
+
         /** @var Room $currentRoom */
-        $currentRoom = $this->user->getRoom() ?: $roomRepository->find(self::DEFAULT_ROOM);
+        $currentRoom = $this->user->getRoom();
 
         $x = $currentRoom->getX();
         $y = $currentRoom->getY();
@@ -48,21 +53,35 @@ class Move extends AbstractGameCommand {
 
         $destinationRoom = $roomRepository->findOneByXandY($x, $y);
 
-        $result = new CommandResponse('move');
-
-        if (!$destinationRoom) {
-            $result->addError('В эту сторону не пройти');
+        if (!$destinationRoom || !$this->userCanWalkToRoom($destinationRoom)) {
+            $this->result->addError('В эту сторону не пройти');
         } else {
             $this->user->setRoom($destinationRoom);
             $em->flush($this->user);
 
+            /** @var \Redis $redis */
+            $redis = $this->container->get('snc_redis.default');
+            $redis->hset(RedisClientInterface::ID_ROOM_HASH, $userId, $destinationRoom->getId());
+
+            $logger = $this->container->get('kingdom.logger');
+            $logString = sprintf(
+                '[%d]%s переместился %s в комнату [%d]%s [%d/%d/%d]',
+                $userId,
+                $userName,
+                $directionTo,
+                $destinationRoom->getId(),
+                $destinationRoom->getName(),
+                $x,
+                $y,
+                $destinationRoom->getZ()
+            );
+
             $userService = $this->container->get('kingdom.user_service');
-            $userId = $this->user->getId();
 
             $resultData = [
+                'name'          => $userName,
                 'directionTo'   => $directionTo,
                 'directionFrom' => $directionFrom,
-                'name'          => $this->user->getName(),
             ];
 
             if ($usersInCurrentRoom = $userService->getOnlineUsersIdsInRoom($currentRoom, $userId)) {
@@ -71,11 +90,26 @@ class Move extends AbstractGameCommand {
 
             if ($usersInDestinationRoom = $userService->getOnlineUsersIdsInRoom($destinationRoom, $userId)) {
                 $resultData['enter'] = $userService->getSessionsByUserIds($usersInDestinationRoom);
+
+                $logString .= sprintf(
+                    ', встретил игроков: [%s]',
+                    implode(',', $usersInDestinationRoom)
+                );
             }
 
-            $result->setData($resultData);
+            $logger->info($logString);
+            $this->result->setData($resultData);
         }
 
-        return $result;
+        return $this->result;
+    }
+
+    /**
+     * Может ли персонаж войти в комнату
+     * @param Room $room
+     * @return bool
+     */
+    private function userCanWalkToRoom(Room $room) {
+        return $room->getType()->userCanWalk();
     }
 }

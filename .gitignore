@@ -1,5 +1,6 @@
 # Symfony directories and files
-bin/
+bin/*
+!/bin/.gitkeep
 vendor/
 app/bootstrap.php.cache
 app/cache/*
@@ -20,6 +21,16 @@ composer.phar
 .idea/
 
 # JS and CSS compiled files
-web/assets/*
 web/css/style.css
-web/js/client.js
+web/js/scripts.js
+web/js/libraries.js
+
+# npm
+node_modules/*
+
+# node modules under git
+!node_modules/autobahn
+!node_modules/wamp.rt
+
+tests/_output/*
+/tests/_support/_generated

@@ -7,6 +7,7 @@ use Rottenwood\KingdomBundle\Command\Infrastructure\CommandResponse;
 
 /**
  * Просмотр инвентаря и одетых вещей игрока
+ * Применение в js: Kingdom.Websocket.command('inventory')
  */
 class Inventory extends AbstractGameCommand {
 
@@ -14,34 +15,33 @@ class Inventory extends AbstractGameCommand {
      * @return CommandResponse
      */
     public function execute() {
-        $result = new CommandResponse('inventory');
-
-        $equipedItemsIds = $this->container->get('kingdom.user_service')->getEquipedItemsIds($this->user);
         $inventoryItems = $this->container->get('kingdom.inventory_item_repository')->findByUser($this->user);
 
         $itemData = [];
         foreach ($inventoryItems as $inventoryItem) {
             $item = $inventoryItem->getItem();
             $itemId = $item->getId();
+            $itemSlot = $inventoryItem->getSlot();
 
             $itemResult = [
                 'itemId'       => $itemId,
                 'name'         => $item->getName(),
+                'name4'        => $item->getName4(),
                 'description'  => $item->getDescription(),
                 'quantity'     => $inventoryItem->getQuantity(),
                 'allowedSlots' => $item->getSlots(),
                 'pic'          => $item->getPicture(),
             ];
 
-            if (in_array($itemId, $equipedItemsIds)) {
-                $itemResult['slot'] = array_search($itemId, $equipedItemsIds);
+            if ($itemSlot) {
+                $itemResult['slot'] = $itemSlot;
             }
 
             $itemData[] = $itemResult;
         }
 
-        $result->setData($itemData);
+        $this->result->setData($itemData);
 
-        return $result;
+        return $this->result;
     }
 }

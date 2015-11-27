@@ -8,6 +8,7 @@ use Rottenwood\KingdomBundle\Entity\Room;
 
 /**
  * Отрисовка карты
+ * Применение в js: Kingdom.Websocket.command('composeMap')
  */
 class ComposeMap extends AbstractGameCommand {
 
@@ -26,6 +27,7 @@ class ComposeMap extends AbstractGameCommand {
         $currentY = $currentRoom->getY();
 
         $roomRepository = $this->container->get('kingdom.room_repository');
+        $resourceRepository = $this->container->get('kingdom.room_resource_repository');
 
         $map = [];
 
@@ -50,12 +52,32 @@ class ComposeMap extends AbstractGameCommand {
             }
         }
 
-        return new CommandResponse('composeMap', [
-            'name'        => $currentRoom->getName() ?: $currentRoom->getType()->getName(),
-            'description' => $currentRoom->getDescription() ?: $currentRoom->getType()->getDescription(),
+        $result = [
+            'name'        => $currentRoom->getName(),
+            'description' => $currentRoom->getDescription(),
             'x'           => $currentX,
             'y'           => $currentY,
-            ], $map);
+        ];
+
+        $roomResources = $resourceRepository->findByRoom($currentRoom);
+
+        foreach ($roomResources as $roomResource) {
+            $resourceQuantity = $roomResource->getQuantity();
+
+            if ($resourceQuantity > 0) {
+                $result['resources'][] = [
+                    'id'       => $roomResource->getItem()->getId(),
+                    'name'     => $roomResource->getItem()->getName(),
+                    'name4'    => $roomResource->getItem()->getName4(),
+                    'quantity' => $resourceQuantity,
+                ];
+            }
+        }
+
+        $this->result->setData($result);
+        $this->result->setMapData($map);
+
+        return $this->result;
     }
 
     /**
