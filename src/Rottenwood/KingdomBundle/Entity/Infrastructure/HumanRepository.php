@@ -6,7 +6,7 @@ use Rottenwood\KingdomBundle\Entity\Human;
 use Rottenwood\KingdomBundle\Entity\Room;
 
 //TODO[Rottenwood]: Rename to HumanRepository
-class UserRepository extends AbstractRepository {
+class HumanRepository extends AbstractRepository {
 
     /**
      * @param int $userId
@@ -25,7 +25,10 @@ class UserRepository extends AbstractRepository {
     public function findOnlineByRoom($room, array $onlinePlayerIds, array $excludePlayerIds = []) {
         $builder = $this->createQueryBuilder('u');
         $builder->where('u.room = :room');
-        $builder->andWhere($builder->expr()->in('u.id', $onlinePlayerIds));
+
+        if ($onlinePlayerIds) {
+            $builder->andWhere($builder->expr()->in('u.id', $onlinePlayerIds));
+        }
 
         if (!empty($excludePlayerIds)) {
             $builder->andWhere($builder->expr()->notIn('u.id', $excludePlayerIds));
@@ -39,7 +42,7 @@ class UserRepository extends AbstractRepository {
     /**
      * @return Human[]
      */
-    public function findAllUsers() {
+    public function findAllHumans() {
         return $this->findAll();
     }
 

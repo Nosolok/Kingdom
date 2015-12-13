@@ -1,5 +1,34 @@
+/**
+ * Текущая игровая комната
+ */
 Kingdom.Room = (function () {
+    var name,
+        x,
+        y;
+
     return {
+
+        /**
+         * Установка параметров комнаты
+         * @param roomData
+         */
+        setData: function (roomData) {
+            name = roomData.name;
+            x = roomData.x;
+            y = roomData.y;
+        },
+
+        /**
+         * Запрос имени комнаты
+         * @returns string
+         */
+        getName: function () {
+            return name + ' [' + x + '/' + y + ']';
+        },
+
+        /**
+         * @param resourcesData
+         */
         updateResources: function (resourcesData) {
             var $gameContentRoom = $('#game-room');
 

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 command -v curl >/dev/null 2>&1 || { echo "Curl не установлен. Установка: sudo apt-get install curl"; exit 1; }
 command -v docker >/dev/null 2>&1 || { echo "Докер не установлен. Установка: curl -sSL https://get.docker.com/ | sh"; exit 1; }
@@ -8,24 +8,34 @@ case $1 in
     $0 help
 ;;
 
+'check')
+    if [[ $2 = "update" ]]; then
+        echo "Обновление зависимостей composer ..."
+        vendor/vinkla/climb/bin/climb update $3
+    else
+        echo "Проверка наличия новых версий вендорных библиотек composer ..."
+        vendor/vinkla/climb/bin/climb
+    fi
+;;
+
 'download')
     # Проверка соединения с сетью
     echo -e "GET http://google.com HTTP/1.0\n\n" | nc google.com 80 > /dev/null 2>&1
 
     if [ $? -eq 0 ]; then
         echo "Обновление образа из Docker hub ..."
-        docker pull rottenwood/kingdom
+        docker pull rottenwood/kingdom:php7
     fi
 ;;
 
 'build')
     $0 stop
     echo "Сборка Docker-образа ..."
-    docker rmi rottenwood/kingdom > /dev/null 2>&1
-    docker build --no-cache -t rottenwood/kingdom .
+    docker rmi rottenwood/kingdom:php7 > /dev/null 2>&1
+    docker build --no-cache -t rottenwood/kingdom:php7 .
 
     if [ ! -z $2 ] && [ $2 = "push" ]; then
-        docker push rottenwood/kingdom
+        docker push rottenwood/kingdom:php7
     fi
 ;;
 
@@ -44,18 +54,13 @@ case $1 in
         wget https://getcomposer.org/composer.phar
         chmod +x composer.phar
         ./composer.phar install --no-interaction
-
-        DB_USER=$(cat app/config/parameters.yml | grep database_user | sed "s/.*database_user: //")
-        DB_PASSWORD=$(cat app/config/parameters.yml | grep database_password | sed "s/.*database_password: //")
     fi
-
-    echo "Имя пользователя БД из конфига: \033[1;33;24m$DB_USER\033[0m"
-    echo "Пароль пользователя БД из конфига: \033[1;33;24m$DB_PASSWORD\033[0m"
 
     echo "Запуск контейнера с сервером MySQL ..."
     docker run -d --name kingdom-mysql-server \
         -p 3307:3306 \
         --volumes-from=kingdom-mysql-data \
+        -v $(pwd)/app/sessions:/var/lib/php/sessions \
         -e MYSQL_USER=$(cat app/config/parameters.yml | grep database_user | sed "s/.*database_user: //") \
         -e MYSQL_PASS=$(cat app/config/parameters.yml | grep database_password | sed "s/.*database_password: //") \
         tutum/mysql
@@ -71,7 +76,7 @@ case $1 in
         fi
     fi
 
-    echo "Выбрано symfony окружение: \033[1;31m$SYMFONY_ENVIRONMENT\033[0m"
+    echo -e "Выбрано symfony окружение: \033[1;31m$SYMFONY_ENVIRONMENT\033[0m"
 
     echo "Создание нового контейнера ..."
     docker run -d --name="kingdom" \
@@ -80,19 +85,19 @@ case $1 in
         --link kingdom-mysql-server:mysql \
         -e SYMFONY_ENVIRONMENT="$SYMFONY_ENVIRONMENT" \
         -e TERM=xterm \
-        rottenwood/kingdom
+        rottenwood/kingdom:php7
 
     SERVER_URL="$(ifconfig docker | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*')"
 
     if [ -z $(docker inspect --format='{{.NetworkSettings.IPAddress}}' kingdom) ]; then
-        echo "\033[1;31mКонтейнер не был создан!\033[0m"
+        echo -e "\033[1;31mКонтейнер не был создан!\033[0m"
         exit 1
     fi
 
     echo "Контейнер создан!"
-    echo "Игра доступна по адресу: \033[1;33;24mhttp://$SERVER_URL:81\033[0m"
+    echo -e "Игра доступна по адресу: \033[1;33;24mhttp://$SERVER_URL:81\033[0m"
     echo "Если контейнер запускается впервые, системе понадобится время для установки и настройки."
-    echo "Это может занять около минуты. Детальная информация в логах: \033[5;33;24m$0 log\033[0m"
+    echo -e "Это может занять около минуты. Детальная информация в логах: \033[5;33;24m$0 log\033[0m"
 ;;
 
 'stop')
@@ -225,32 +230,35 @@ case $1 in
     ;;
 
     'players')
-        docker exec kingdom cat /kingdom/app/logs/game_logs/user_actions.log | awk -F" "  '{array[$3]}END{for (player in array) print player}'
+        docker exec kingdom cat /kingdom/app/logs/game_logs/user_actions.log \
+        | awk -F" "  '{array[$3]}END{for (player in array) print player}' \
+        | sort --version-sort
     ;;
     esac
 ;;
 
 'help')
-	echo "--------------------------------------------------------------------"
-	echo "\033[1;33;24m$0 start\033[0m [dev|test] - Запуск контейнера [в dev-окружении (без кэширования)]"
-	echo "\033[1;33;24m$0 restart\033[0m [dev|test]- Немедленный перезапуск контейнеров"
-	echo "\033[1;33;24m$0 stop\033[0m - Остановка контейнера"
-	echo "\033[1;33;24m$0 reboot\033[0m [dev] - Отложенная перезагрузка (с оповещением игроков)"
-	echo ""
-	echo "\033[1;33;24m$0 log\033[0m [game|players|nginx]- просмотр логов"
-	echo "\033[1;33;24m$0 bash\033[0m - Запуск серверной консоли"
-	echo "\033[1;33;24m$0 mysql\033[0m - Запуск консоли MySQL"
-	echo "\033[1;33;24m$0 update\033[0m - Обновление структуры базы данных"
-	echo "\033[1;33;24m$0 console\033[0m - Консоль Symfony"
-	echo "\033[1;33;24m$0 (cache|clear)\033[0m [warm] - Очистка кэша"
-	echo "\033[1;33;24m$0 (css|js|gulp)\033[0m - Сборка CSS и JS с помощью gulp"
-	echo ""
-	echo "\033[1;33;24m$0 broadcast (phrase)\033[0m - Отправка сообщения всем игрокам онлайн"
-	echo ""
-	echo "\033[1;33;24m$0 deploy\033[0m (dev) - Деплой проекта (git pull, рестарт серверов)"
-	echo "\033[1;33;24m$0 test\033[0m (d|v|-d|-v|debug)- Запуск автоматических тестов (с выводом)"
-	echo "\033[1;33;24m$0 build\033[0m - Сборка нового Docker-образа"
-	echo "\033[1;33;24m$0 drop-database\033[0m - Удаление всех данных из БД"
+	echo -e "--------------------------------------------------------------------"
+	echo -e "\033[1;33;24m$0 start\033[0m [dev|test] - Запуск контейнера [в dev-окружении (без кэширования)]"
+	echo -e "\033[1;33;24m$0 restart\033[0m [dev|test]- Немедленный перезапуск контейнеров"
+	echo -e "\033[1;33;24m$0 stop\033[0m - Остановка контейнера"
+	echo -e "\033[1;33;24m$0 reboot\033[0m [dev] - Отложенная перезагрузка (с оповещением игроков)"
+	echo -e ""
+	echo -e "\033[1;33;24m$0 log\033[0m [game|players|nginx]- просмотр логов"
+	echo -e "\033[1;33;24m$0 bash\033[0m - Запуск серверной консоли"
+	echo -e "\033[1;33;24m$0 mysql\033[0m - Запуск консоли MySQL"
+	echo -e "\033[1;33;24m$0 update\033[0m - Обновление структуры базы данных"
+	echo -e "\033[1;33;24m$0 console\033[0m - Консоль Symfony"
+	echo -e "\033[1;33;24m$0 (cache|clear)\033[0m [warm] - Очистка кэша"
+	echo -e "\033[1;33;24m$0 (css|js|gulp)\033[0m - Сборка CSS и JS с помощью gulp"
+	echo -e ""
+	echo -e "\033[1;33;24m$0 broadcast (phrase)\033[0m - Отправка сообщения всем игрокам онлайн"
+	echo -e ""
+	echo -e "\033[1;33;24m$0 deploy\033[0m (dev) - Деплой проекта (git pull, рестарт серверов)"
+	echo -e "\033[1;33;24m$0 test\033[0m (d|v|-d|-v|debug)- Запуск автоматических тестов (с выводом)"
+	echo -e "\033[1;33;24m$0 build\033[0m - Сборка нового Docker-образа"
+	echo -e "\033[1;33;24m$0 drop-database\033[0m - Удаление всех данных из БД"
+	echo -e "\033[1;33;24m$0 check\033[0m [update [package_name|--all]] - Проверка новых пакетов composer (vinkla/climb)"
 	echo "----------------------------------------------------------------------"
 ;;
 

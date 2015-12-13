@@ -1,8 +1,5 @@
 language: php
 
-php:
-  - 5.5
-
 sudo: required
 
 services:
@@ -14,4 +11,4 @@ install:
     - ./kingdom.sh log
 
 script:
-    - ./kingdom.sh test
+    - ./kingdom.sh test -v

@@ -83,6 +83,7 @@ class CreateRobotCommand extends ContainerAwareCommand
      * Создание денег игрока
      * @param Robot              $robot
      * @param ContainerInterface $container
+     * @return void
      */
     private function createMoney(Robot $robot, ContainerInterface $container)
     {

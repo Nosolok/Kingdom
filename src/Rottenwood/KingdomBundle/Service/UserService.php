@@ -2,6 +2,9 @@
 
 namespace Rottenwood\KingdomBundle\Service;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Criteria;
+use Doctrine\ORM\EntityManager;
 use Monolog\Logger;
 use Rottenwood\KingdomBundle\Entity\Human;
 use Rottenwood\KingdomBundle\Entity\Infrastructure\InventoryItemRepository;
@@ -11,12 +14,12 @@ use Rottenwood\KingdomBundle\Entity\Infrastructure\RoomRepository;
 use Rottenwood\KingdomBundle\Entity\InventoryItem;
 use Rottenwood\KingdomBundle\Entity\Room;
 use Rottenwood\KingdomBundle\Entity\Infrastructure\User;
-use Rottenwood\KingdomBundle\Entity\Infrastructure\UserRepository;
+use Rottenwood\KingdomBundle\Entity\Infrastructure\HumanRepository;
 use Rottenwood\KingdomBundle\Exception\ItemNotFound;
 use Rottenwood\KingdomBundle\Exception\NotEnoughItems;
 use Rottenwood\KingdomBundle\Exception\RoomNotFound;
 use Rottenwood\KingdomBundle\Redis\RedisClientInterface;
-use Snc\RedisBundle\Client\Phpredis\Client;
+use Predis\Client as RedisClient;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
 use Symfony\Component\HttpKernel\KernelInterface;
@@ -26,10 +29,10 @@ class UserService
 
     /** @var KernelInterface */
     private $kernel;
-    /** @var \Redis */
+    /** @var RedisClient */
     private $redis;
-    /** @var UserRepository */
-    private $userRepository;
+    /** @var HumanRepository */
+    private $humanRepository;
     /** @var InventoryItemRepository */
     private $inventoryItemRepository;
     /** @var Logger */
@@ -41,25 +44,25 @@ class UserService
 
     /**
      * @param KernelInterface         $kernel
-     * @param Client                  $redis
+     * @param RedisClient             $redis
      * @param Logger                  $logger
-     * @param UserRepository          $userRepository
+     * @param HumanRepository         $humanRepository
      * @param InventoryItemRepository $inventoryItemRepository
      * @param RoomRepository          $roomRepository
      * @param ItemRepository          $itemRepository
      */
     public function __construct(
         KernelInterface $kernel,
-        Client $redis,
+        RedisClient $redis,
         Logger $logger,
-        UserRepository $userRepository,
+        HumanRepository $humanRepository,
         InventoryItemRepository $inventoryItemRepository,
         RoomRepository $roomRepository,
         ItemRepository $itemRepository
     ) {
         $this->redis = $redis;
         $this->logger = $logger;
-        $this->userRepository = $userRepository;
+        $this->humanRepository = $humanRepository;
         $this->inventoryItemRepository = $inventoryItemRepository;
         $this->kernel = $kernel;
         $this->roomRepository = $roomRepository;
@@ -69,16 +72,16 @@ class UserService
     /**
      * Запрос ID всех онлайн игроков в комнате
      * @param Room  $room
-     * @param array $excludePlayerIds
+     * @param int|int[] $excludePlayerIds
      * @return int[]
      */
-    public function getOnlineUsersIdsInRoom(Room $room, $excludePlayerIds = [])
+    public function getOnlineUsersIdsInRoom(Room $room, $excludePlayerIds = []): array
     {
         return array_map(
             function (User $user) {
                 return $user->getId();
             },
-            $this->getOnlineUsersInRoom($room, $excludePlayerIds)
+            $this->getOnlineHumansInRoom($room, $excludePlayerIds)
         );
     }
 
@@ -88,20 +91,20 @@ class UserService
      * @param int|array $excludePlayerIds
      * @return Human[]
      */
-    public function getOnlineUsersInRoom(Room $room, $excludePlayerIds = [])
+    public function getOnlineHumansInRoom(Room $room, $excludePlayerIds = []): array
     {
         if (!is_array($excludePlayerIds)) {
             $excludePlayerIds = [$excludePlayerIds];
         }
 
-        return $this->userRepository->findOnlineByRoom($room, $this->getOnlineUsersIds(), $excludePlayerIds);
+        return $this->humanRepository->findOnlineByRoom($room, $this->getOnlineUsersIds(), $excludePlayerIds);
     }
 
     /**
      * Запрос id всех игроков онлайн из redis
      * @return int[]
      */
-    public function getOnlineUsersIds()
+    public function getOnlineUsersIds(): array
     {
         return $this->redis->smembers(RedisClientInterface::ONLINE_LIST);
     }
@@ -110,24 +113,26 @@ class UserService
      * @param array $userIds
      * @return array
      */
-    public function getSessionsByUserIds(array $userIds)
+    public function getSessionsByUserIds(array $userIds): array
     {
         return array_values($this->redis->hmget(RedisClientInterface::ID_SESSION_HASH, $userIds));
     }
 
     /**
-     * Передать предмет другому персонажу
+     * Передать один или несколько предметов другому персонажу
      * @param User $userFrom
      * @param User $userTo
-     * @param Item $item
+     * @param Item|Item[] $items
      * @param int  $quantityToGive Сколько предметов передать
      * @return bool
      * @throws \Exception
      */
-    public function giveItem(User $userFrom, User $userTo, Item $item, $quantityToGive = 1)
+    public function giveItems(User $userFrom, User $userTo, $items, int $quantityToGive = 1): bool
     {
+        $items = $this->prepareItemsArray($items);
+
         try {
-            $this->dropItem($userFrom, $item, $quantityToGive);
+            $this->dropItems($userFrom, $items, $quantityToGive);
         } catch (\Exception $exception) {
             if ($exception instanceof ItemNotFound || $exception instanceof NotEnoughItems) {
                 return false;
@@ -136,99 +141,96 @@ class UserService
             }
         }
 
-        $this->takeItem($userTo, $item, $quantityToGive);
+        $this->takeItems($userTo, $items, $quantityToGive);
 
-        $this->logger->info(
-            sprintf(
-                '[%d]%s передал [%d]%s предмет: [%d]%s x %d шт.',
-                $userFrom->getId(),
-                $userFrom->getName(),
-                $userTo->getId(),
-                $userTo->getName(),
-                $item->getId(),
-                $item->getName(),
-                $quantityToGive
-            )
-        );
+        $this->logGivenItems($userFrom, $userTo, $items, $quantityToGive);
 
         return true;
     }
 
     /**
-     * Выбросить предмет
-     * @param User $user
-     * @param Item $item
-     * @param int  $quantityToDrop Сколько предметов выбросить
-     * @return int Количество оставшихся предметов
+     * Выбросить один или несколько предметов
+     * @param User        $user
+     * @param Item|Item[] $items
+     * @param int         $quantityToDrop Сколько предметов выбросить
+     * @return bool
      * @throws ItemNotFound
      * @throws NotEnoughItems
      */
-    public function dropItem(User $user, Item $item, $quantityToDrop)
+    public function dropItems(User $user, $items, int $quantityToDrop): bool
     {
-        $inventoryItem = $this->inventoryItemRepository->findOneByUserAndItemId($user, $item->getId());
+        $items = $this->prepareItemsArray($items);
 
-        if (!$inventoryItem) {
-            throw new ItemNotFound;
+        $inventoryItems = $this->inventoryItemRepository->findByUser($user);
+        $inventoryItemCollection = new ArrayCollection($inventoryItems);
+
+        foreach ($items as $item) {
+            $criteria = Criteria::create();
+            $criteria->where(Criteria::expr()->eq('item', $item));
+
+            $collectedInventoryItem = $inventoryItemCollection->matching($criteria);
+
+            if ($collectedInventoryItem->isEmpty()) {
+                throw new ItemNotFound;
+            }
+
+            $inventoryItem = $collectedInventoryItem->first();
+            $itemQuantity = $inventoryItem->getQuantity();
+            $itemQuantityAfterDrop = $itemQuantity - $quantityToDrop;
+
+            if ($itemQuantityAfterDrop == 0) {
+                $this->inventoryItemRepository->remove($inventoryItem);
+            } elseif ($itemQuantityAfterDrop > 0) {
+                $inventoryItem->setQuantity($itemQuantityAfterDrop);
+            } else {
+                throw new NotEnoughItems;
+            }
         }
 
-        $itemQuantity = $inventoryItem->getQuantity();
-        $itemQuantityAfterDrop = $itemQuantity - $quantityToDrop;
+        $this->inventoryItemRepository->flush();
 
-        if ($itemQuantityAfterDrop == 0) {
-            $this->inventoryItemRepository->remove($inventoryItem);
-        } elseif ($itemQuantityAfterDrop > 0) {
-            $inventoryItem->setQuantity($itemQuantityAfterDrop);
-        } else {
-            throw new NotEnoughItems;
-        }
+        $this->logDroppedItems($user, $items, $quantityToDrop);
 
-        $this->inventoryItemRepository->flush($inventoryItem);
-
-        $this->logger->info(
-            sprintf(
-                '[%d]%s выбросил предмет: [%d]%s x %d шт. (осталось %d)',
-                $user->getId(),
-                $user->getName(),
-                $item->getId(),
-                $item->getName(),
-                $quantityToDrop,
-                $itemQuantityAfterDrop
-            )
-        );
-
-        return $itemQuantityAfterDrop;
+        return true;
     }
 
     /**
-     * Взять предмет
+     * Взять один или несколько предметов
      * @param User $user
-     * @param Item $item
+     * @param Item|Item[] $items
      * @param int  $quantityToTake Сколько предметов взять
      */
-    public function takeItem(User $user, Item $item, $quantityToTake = 1)
+    public function takeItems(User $user, $items, int $quantityToTake = 1)
     {
-        $inventoryItem = $this->inventoryItemRepository->findOneByUserAndItemId($user, $item->getId());
+        $itemsToTake = $this->prepareItemsArray($items);
 
-        if ($inventoryItem) {
-            $quantity = $inventoryItem->getQuantity() + $quantityToTake;
-            $inventoryItem->setQuantity($quantity);
-        } else {
-            $inventoryItem = new InventoryItem($user, $item, $quantityToTake);
-            $this->inventoryItemRepository->persist($inventoryItem);
+        $inventoryItems = $this->inventoryItemRepository->findByUser($user);
+        $inventoryItemCollection = new ArrayCollection($inventoryItems);
+
+        foreach ($itemsToTake as $itemToTake) {
+            $criteria = Criteria::create();
+            $criteria->where(Criteria::expr()->eq('item', $itemToTake));
+
+            $collectedInventoryItem = $inventoryItemCollection->matching($criteria);
+
+            if ($collectedInventoryItem->count() === 1) {
+                $inventoryItem = $collectedInventoryItem->first();
+                $quantity = $inventoryItem->getQuantity() + $quantityToTake;
+                $inventoryItem->setQuantity($quantity);
+            } elseif ($collectedInventoryItem->count() === 0) {
+                $inventoryItem = new InventoryItem($user, $itemToTake, $quantityToTake);
+                $this->inventoryItemRepository->persist($inventoryItem);
+            } else {
+                throw new \RuntimeException('Найдено более одного предмета');
+            }
         }
 
-        $this->inventoryItemRepository->flush($inventoryItem);
+        $this->inventoryItemRepository->flush();
 
-        $this->logger->info(
-            sprintf(
-                '[%d]%s взял предмет: [%d]%s x %d шт. (всего %d)',
-                $user->getId(),
-                $user->getName(),
-                $item->getId(),
-                $item->getName(),
-                $quantityToTake,
-                isset($quantity) ? $quantity : $quantityToTake
-            )
+        $this->logObtainedItems(
+            $user,
+            $itemsToTake,
+            $quantityToTake
         );
     }
 
@@ -236,7 +238,7 @@ class UserService
      * Установка рэндомного аватара
      * @return string
      */
-    public function pickAvatar()
+    public function pickAvatar(): string
     {
         $finder = new Finder();
 
@@ -261,7 +263,7 @@ class UserService
      * @param string $string
      * @return string
      */
-    public function transliterate($string)
+    public function transliterate(string $string): string
     {
         $englishLetters = implode('', array_keys($this->getAlphabet()));
         $cyrillicLetters = 'абвгдеёжзиклмнопрстуфхцчшщьыъэюяАБВГДЕЁЖЗИКЛМНОПРСТУФХЦЧШЩЬЫЪЭЮЯ';
@@ -282,7 +284,7 @@ class UserService
      * Массив соответствия русских букв латинским
      * @return string[]
      */
-    private function getAlphabet()
+    private function getAlphabet(): array
     {
         return [
             'a' => 'а', 'b' => 'б', 'c' => 'ц', 'd' => 'д', 'e' => 'е',
@@ -304,7 +306,7 @@ class UserService
      * @return Room
      * @throws RoomNotFound
      */
-    public function getStartRoom()
+    public function getStartRoom(): Room
     {
         $startRoom = $this->roomRepository->findOneByXandY(0, 0);
 
@@ -330,9 +332,126 @@ class UserService
 
         $items = $this->itemRepository->findSeveralByIds($starterItemsIds);
 
-        //TODO[Rottenwood]: Заменить на метод принимающий массив предметов
-        foreach ($items as $item) {
-            $this->takeItem($user, $item);
+        $this->takeItems($user, $items);
+    }
+
+    /**
+     * Подготовка массива предметов
+     * @param Item|Item[] $items
+     * @return Item[]
+     * @throws NotEnoughItems
+     */
+    private function prepareItemsArray($items): array
+    {
+        $preparedItems = [];
+        if (is_array($items) && current($items) instanceof Item) {
+            $preparedItems = $items;
+        } elseif ($items instanceof Item) {
+            $preparedItems[] = $items;
+        } else {
+            throw new \RuntimeException('$items must be Item or array of Items entity');
         }
+
+        if (empty($preparedItems)) {
+            throw new NotEnoughItems('Не передано ни одного предмета для действия');
+        }
+
+        return $preparedItems;
+    }
+
+    /**
+     * @param User   $user
+     * @param Item[] $itemsToTake
+     * @param int    $quantityToTake
+     */
+    private function logObtainedItems(User $user, array $itemsToTake, int $quantityToTake)
+    {
+        /** @var Item $item */
+        foreach ($itemsToTake as $item) {
+            $this->logger->info(
+                sprintf(
+                    '[%d]%s взял предмет: [%d]%s x %d шт.',
+                    $user->getId(),
+                    $user->getName(),
+                    $item->getId(),
+                    $item->getName(),
+                    $quantityToTake
+                )
+            );
+        }
+    }
+
+    /**
+     * @param User   $userFrom
+     * @param User   $userTo
+     * @param Item[] $items
+     * @param int    $quantityToGive
+     */
+    private function logGivenItems(User $userFrom, User $userTo, array $items, int $quantityToGive)
+    {
+        /** @var Item $item */
+        foreach ($items as $item) {
+            $this->logger->info(
+                sprintf(
+                    '[%d]%s передал [%d]%s предмет: [%d]%s x %d шт.',
+                    $userFrom->getId(),
+                    $userFrom->getName(),
+                    $userTo->getId(),
+                    $userTo->getName(),
+                    $item->getId(),
+                    $item->getName(),
+                    $quantityToGive
+                )
+            );
+        }
+    }
+
+    /**
+     * @param User   $user
+     * @param Item[] $items
+     * @param int    $quantityToDrop
+     */
+    private function logDroppedItems($user, array $items, int $quantityToDrop)
+    {
+        foreach ($items as $item) {
+            $this->logger->info(
+                sprintf(
+                    '[%d]%s выбросил предмет: [%d]%s x %d шт.',
+                    $user->getId(),
+                    $user->getName(),
+                    $item->getId(),
+                    $item->getName(),
+                    $quantityToDrop
+                )
+            );
+        }
+    }
+
+    /**
+     * Назначение вейтстейта юзеру
+     * @param int $waitState
+     * @return bool
+     */
+    public function addWaitstate(User $user, int $waitState): bool {
+        $user->addWaitstate($waitState);
+        $this->getEntityManager()->flush($user);
+
+        return true;
+    }
+
+    /**
+     * @return EntityManager
+     */
+    private function getEntityManager(): EntityManager {
+        return $this->humanRepository->getEntityManager();
+    }
+
+    /**
+     * @param User $user
+     */
+    public function dropWaitState(User $user)
+    {
+        $user->dropWaitState();
+        $this->getEntityManager()->flush($user);
     }
 }

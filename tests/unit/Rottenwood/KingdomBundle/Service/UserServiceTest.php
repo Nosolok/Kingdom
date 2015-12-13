@@ -1,8 +1,4 @@
 <?php
-/**
- * Author: Rottenwood
- * Date Created: 05.11.15 23:11
- */
 
 namespace Rottenwood\KingdomBundle\Service;
 
@@ -10,9 +6,9 @@ use Monolog\Logger;
 use Rottenwood\KingdomBundle\Entity\Infrastructure\InventoryItemRepository;
 use Rottenwood\KingdomBundle\Entity\Infrastructure\ItemRepository;
 use Rottenwood\KingdomBundle\Entity\Infrastructure\RoomRepository;
-use Rottenwood\KingdomBundle\Entity\Infrastructure\UserRepository;
+use Rottenwood\KingdomBundle\Entity\Infrastructure\HumanRepository;
 use Rottenwood\KingdomBundle\Entity\Room;
-use Snc\RedisBundle\Client\Phpredis\Client;
+use Predis\Client as RedisClient;
 use Symfony\Component\HttpKernel\KernelInterface;
 
 class UserServiceTest extends \PHPUnit_Framework_TestCase
@@ -21,7 +17,7 @@ class UserServiceTest extends \PHPUnit_Framework_TestCase
     private $kernel;
     private $redis;
     private $logger;
-    private $userRepository;
+    private $humanRepository;
     private $inventoryItemRepository;
     private $roomRepository;
     public $itemRepository;
@@ -29,9 +25,9 @@ class UserServiceTest extends \PHPUnit_Framework_TestCase
     protected function setUp()
     {
         $this->kernel = \Phake::mock(KernelInterface::class);
-        $this->redis = \Phake::mock(Client::class);
+        $this->redis = \Phake::mock(RedisClient::class);
         $this->logger = \Phake::mock(Logger::class);
-        $this->userRepository = \Phake::mock(UserRepository::class);
+        $this->humanRepository = \Phake::mock(HumanRepository::class);
         $this->inventoryItemRepository = \Phake::mock(InventoryItemRepository::class);
         $this->roomRepository = \Phake::mock(RoomRepository::class);
         $this->itemRepository = \Phake::mock(ItemRepository::class);
@@ -65,7 +61,7 @@ class UserServiceTest extends \PHPUnit_Framework_TestCase
         return new UserService($this->kernel,
             $this->redis,
             $this->logger,
-            $this->userRepository,
+            $this->humanRepository,
             $this->inventoryItemRepository,
             $this->roomRepository,
             $this->itemRepository

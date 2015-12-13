@@ -15,7 +15,7 @@ class ShowPlayersInRoom extends AbstractGameCommand {
     /**
      * @return CommandResponse
      */
-    public function execute() {
+    public function execute(): CommandResponse {
         $playersInRoom = array_map(
             function(User $user) {
                 return [
@@ -23,7 +23,7 @@ class ShowPlayersInRoom extends AbstractGameCommand {
                     'stance' => 'стоит тут.',
                 ];
             },
-            $this->container->get('kingdom.user_service')->getOnlineUsersInRoom(
+            $this->container->get('kingdom.user_service')->getOnlineHumansInRoom(
                 $this->user->getRoom(),
                 $this->user->getId()
             )

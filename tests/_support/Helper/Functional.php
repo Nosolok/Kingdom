@@ -2,8 +2,8 @@
 namespace Helper;
 
 use Codeception\Module\Symfony2;
-use PHPUnit_Framework_Assert;
 use Rottenwood\KingdomBundle\Entity\Human;
+use Rottenwood\KingdomBundle\Entity\Infrastructure\User;
 use Rottenwood\KingdomBundle\Entity\InventoryItem;
 use Rottenwood\KingdomBundle\Entity\Room;
 
@@ -65,9 +65,58 @@ class Functional extends AbstractHelper
 
         $item = $itemRepository->findOneByUserAndItemId($user, $itemId);
 
-        PHPUnit_Framework_Assert::assertNotNull($item);
+        \PHPUnit_Framework_Assert::assertNotNull($item);
 
         return $item;
+    }
+
+    /**
+     * Запрос всех предметов персонажа
+     * @return InventoryItem[]
+     */
+    public function getAllItems()
+    {
+        $symfonyModule = $this->getSymfonyModule();
+        $user = $this->getUser($symfonyModule);
+
+        $inventoryItemRepository = $symfonyModule->container->get('kingdom.inventory_item_repository');
+
+        return $inventoryItemRepository->findByUser($user);
+    }
+
+    /**
+     * Удаление всех предметов персонажа
+     */
+    public function deleteAllItems()
+    {
+        $symfonyModule = $this->getSymfonyModule();
+        $user = $this->getUser($symfonyModule);
+
+        $inventoryItemRepository = $symfonyModule->container->get('kingdom.inventory_item_repository');
+
+        /** @var InventoryItem $inventoryItem */
+        foreach ($inventoryItemRepository->findByUser($user) as $inventoryItem) {
+            $inventoryItemRepository->remove($inventoryItem);
+        }
+
+        $inventoryItemRepository->flush();
+    }
+
+    /**
+     * @param InventoryItem[] $inventoryItems
+     */
+    public function loadAllItems(array $inventoryItems)
+    {
+        $symfonyModule = $this->getSymfonyModule();
+
+        $inventoryItemRepository = $symfonyModule->container->get('kingdom.inventory_item_repository');
+
+        /** @var InventoryItem $inventoryItem */
+        foreach ($inventoryItems as $inventoryItem) {
+            $inventoryItemRepository->persist($inventoryItem);
+        }
+
+        $inventoryItemRepository->flush();
     }
 
     /**
@@ -121,7 +170,7 @@ class Functional extends AbstractHelper
         $roomRepository = $symfonyModule->container->get('kingdom.room_repository');
         $room = $roomRepository->findOneByXandY($x, $y);
 
-        PHPUnit_Framework_Assert::assertEquals($user->getRoom()->getId(), $room->getId());
+        \PHPUnit_Framework_Assert::assertEquals($user->getRoom()->getId(), $room->getId());
     }
 
     /**
@@ -132,24 +181,35 @@ class Functional extends AbstractHelper
     {
         $result = $this->runCommand('getMoney');
 
-        PHPUnit_Framework_Assert::assertEquals($gold, $result['data']['gold']);
-        PHPUnit_Framework_Assert::assertEquals($silver, $result['data']['silver']);
+        \PHPUnit_Framework_Assert::assertEquals($gold, $result['data']['gold']);
+        \PHPUnit_Framework_Assert::assertEquals($silver, $result['data']['silver']);
+    }
+
+    /**
+     * Обнуление вейтстейта игрока
+     */
+    public function haveNoWaitState()
+    {
+        $symfony = $this->getSymfonyModule();
+        $user = $this->getUser($symfony);
+        $userService = $symfony->container->get('kingdom.user_service');
+        $userService->dropWaitState($user);
     }
 
     /**
      * @return Symfony2
      * @throws \Codeception\Exception\ModuleException
      */
-    private function getSymfonyModule()
+    private function getSymfonyModule(): Symfony2
     {
         return $this->getModule('Symfony2');
     }
 
     /**
      * @param $symfonyModule
-     * @return Human
+     * @return User
      */
-    private function getUser($symfonyModule)
+    private function getUser($symfonyModule): User
     {
         return $symfonyModule->container->get('security.token_storage')->getToken()->getUser();
     }

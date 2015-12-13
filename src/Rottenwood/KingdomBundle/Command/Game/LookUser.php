@@ -16,8 +16,8 @@ class LookUser extends AbstractGameCommand {
      * @return CommandResponse
      * @throws UserNotFound
      */
-    public function execute() {
-        $userToLookAt = $this->container->get('kingdom.user_repository')->findByName($this->parameters);
+    public function execute(): CommandResponse {
+        $userToLookAt = $this->container->get('kingdom.human_repository')->findByName($this->parameters);
 
         if (!$userToLookAt) {
             throw new UserNotFound;

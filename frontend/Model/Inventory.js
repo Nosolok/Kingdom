@@ -1,5 +1,5 @@
 /**
- * Инвентарь персонажа (все одетые и неодетые предметы)
+ * Инвентарь персонажа (все надетые и ненадетые предметы)
  */
 Kingdom.Inventory = (function () {
     var items = new $.Deferred();
@@ -23,13 +23,26 @@ Kingdom.Inventory = (function () {
         },
 
         /**
-         * Удаление предмета из инвентаря
+         * Надевание предмета
+         * @param itemId int
+         * @param slot string
+         */
+        wearItem: function (itemId, slot) {
+            items.items.forEach(function (item, key, itemsArray) {
+                if (item.itemId == itemId) {
+                    itemsArray[key]['slot'] = slot;
+                }
+            });
+        },
+
+        /**
+         * Снятие предмета
          * @param itemId int
          */
         removeItem: function (itemId) {
-            items.items.forEach(function (item, key) {
+            items.items.forEach(function (item, key, itemsArray) {
                 if (item.itemId == itemId) {
-                    items.items.splice(key, 1);
+                    delete itemsArray[key]['slot'];
                 }
             });
         }

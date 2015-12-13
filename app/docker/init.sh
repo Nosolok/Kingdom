@@ -13,7 +13,8 @@ echo "Запуск nginx ..."
 /etc/init.d/nginx start
 
 echo "Обновление библиотек композера ..."
-sudo /composer.phar install -n -d /kingdom/
+sudo /composer.phar config -g github-oauth.github.com 0c8682fe7bcabe7618e8342f6dfbc6bb1e0da05d
+sudo /composer.phar install --prefer-dist -o -n -d /kingdom/
 sudo chown -R www-data:www-data /kingdom/vendor /kingdom/bin /kingdom/app/cache /kingdom/app/logs
 
 echo "Очистка кэша ..."
@@ -29,7 +30,7 @@ echo "Загрузка игровых данных в БД ..."
 sudo -u www-data /kingdom/app/console kingdom:create:map -e $SYMFONY_ENVIRONMENT
 
 echo "Инициализация серверов ..."
-/etc/init.d/php5-fpm start
+/etc/init.d/php7.0-fpm start
 /etc/init.d/redis-server start
 /etc/init.d/nginx start
 
@@ -50,8 +51,11 @@ else
     /kingdom/app/console kingdom:create:items -e $SYMFONY_ENVIRONMENT
 fi
 
-echo "Настройка прав на логи"
+echo "Настройка прав ..."
+echo "... на логи"
 chown -R www-data /kingdom/app/logs
+echo "... на сессии"
+chown -R www-data /var/lib/php/sessions
 
 echo "Очистка кэша ..."
 rm -rf /kingdom/app/cache/dev /kingdom/app/cache/prod /kingdom/app/logs/dev.log /kingdom/app/logs/prod.log
@@ -67,16 +71,14 @@ else
     cp /kingdom/app/docker/symfony/app_dev.php /kingdom/web/
     mv /etc/nginx/nginx-dev.conf /etc/nginx/nginx.conf
 
-    echo "Включение модуля xdebug"
-    sudo php5enmod xdebug
+    # TODO: Включение модуля xdebug [sudo php5enmod xdebug]
 
-    echo "Рестарт php5-fpm ..."
-    sudo service php5-fpm restart
+    echo "Рестарт php-fpm ..."
+    /etc/init.d/php7.0-fpm restart
 fi
 
 echo "Отключение страницы с информацией о загрузке ..."
 rm /etc/nginx/sites-enabled/maintain.conf
-
 
 echo "Рестарт nginx ..."
 sudo service nginx restart

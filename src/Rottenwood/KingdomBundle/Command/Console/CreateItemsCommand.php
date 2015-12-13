@@ -26,11 +26,11 @@ class CreateItemsCommand extends ContainerAwareCommand {
         $container = $this->getContainer();
 
         $itemRepository = $container->get('kingdom.item_repository');
-        $userRepository = $container->get('kingdom.user_repository');
+        $humanRepository = $container->get('kingdom.human_repository');
         $em = $itemRepository->getEntityManager();
 
         $items = $itemRepository->findAllItems();
-        $users = $userRepository->findAllUsers();
+        $users = $humanRepository->findAllHumans();
         $rooms = $container->get('kingdom.room_repository')->findAllRooms();
 
         if (count($items)) {
@@ -98,7 +98,7 @@ class CreateItemsCommand extends ContainerAwareCommand {
      * Парсинг yaml-файлов с данными об игровых предметах
      * @return array
      */
-    private function parseItemsFromYaml() {
+    private function parseItemsFromYaml(): array {
         $yamlParser = new Parser();
         $fileFinder = new Finder();
 

@@ -60,7 +60,6 @@ connection.onopen = function (session) {
                             } else if (command == 'move') {
                                 runConsoleCommand(character, command, function (commandResponseJson) {
                                     var responseData = JSON.parse(commandResponseJson).data;
-                                    var responseErrors = JSON.parse(commandResponseJson).errors;
 
                                     if (responseData) {
                                         if (responseData.hasOwnProperty('left')) {
@@ -79,13 +78,7 @@ connection.onopen = function (session) {
                                         }
                                     }
 
-                                    var commandResponse = {commandName: command};
-
-                                    if (responseErrors) {
-                                        commandResponse.errors = responseErrors;
-                                    }
-
-                                    publishToLocalChannel(JSON.stringify(commandResponse));
+                                    publishToLocalChannel(commandResponseJson);
                                 });
                             } else {
                                 runConsoleCommand(character, command, function (commandResultJson) {
@@ -101,7 +94,8 @@ connection.onopen = function (session) {
                                                         {
                                                             event: 'obtainWood',
                                                             name: character.name,
-                                                            resources: commandResult.data.resources
+                                                            resources: commandResult.data.resources,
+                                                            typeChanged: commandResult.data.typeChanged
                                                         }
                                                     }
                                                 );

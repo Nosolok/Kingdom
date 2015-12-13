@@ -27,10 +27,13 @@ $(function () {
     });
 
     $openButton.on('click', function () {
-        var html = '<div>Золото: ' + Kingdom.Money.getGold() + '</div>'
-            + '<div>Серебро: ' + Kingdom.Money.getSilver() + '</div>';
+        var money = Kingdom.Money.getMoney();
+        money.done(function () {
+            var html = '<div>Золото: ' + money.gold + '</div>'
+                + '<div>Серебро: ' + money.silver + '</div>';
 
-        $('#game-inventory').find('.money').html(html);
+            $('#game-inventory').find('.money').html(html);
+        });
     });
 
     /**
@@ -264,6 +267,17 @@ $(function () {
     }
 
     /**
+     * Изменение изображения предмета
+     * @param $item
+     * @param $image
+     */
+    function changeItemImage($item, $image) {
+        var $removedItemImage = $item.find('img');
+
+        $removedItemImage.attr('src', $image.attr('src'));
+    }
+
+    /**
      * Надеть предмет
      * @param $item
      * @param $slot
@@ -272,6 +286,12 @@ $(function () {
         var slotName = $slot.data('slot');
         var itemQtip = $item.qtip('api');
         var itemId = $item.data('id');
+
+        if ($slot.hasClass('dressed')) {
+            changeItemImage(createItemFromSlot($slot), $slot.find('img'));
+            $inventory.find('.paperdoll .slot').removeClass('highlight');
+            makeItemsDraggable();
+        }
 
         $slot.addClass('dressed');
         $slot.removeClass('nointeract');
@@ -309,6 +329,7 @@ $(function () {
 
         initializePaperdollSlots();
 
+        Kingdom.Inventory.wearItem(itemId, slotName);
         Kingdom.Websocket.command('wear', [itemId, slotName]);
 
         ion.sound.play('wear-clothes');
@@ -320,13 +341,32 @@ $(function () {
      */
     function removeItem($slot) {
         var slotName = $slot.data('slot');
-        var slotQtip = $slot.qtip('api');
 
         $slot.addClass('nointeract');
         $slot.removeClass('dressed');
         $slot.draggable('destroy');
-        slotQtip.destroy();
+        $slot.qtip('api').destroy();
 
+        var $item = createItemFromSlot($slot);
+
+        $inventory.find('.paperdoll .slot').removeClass('highlight');
+
+        makeItemsDraggable();
+
+        Kingdom.Chat.addInfo('Ты снял ' + $item.data('name4'));
+        Kingdom.Inventory.removeItem($item.data('id'));
+        Kingdom.Websocket.command('remove', slotName);
+
+        ion.sound.play('remove-clothes');
+    }
+
+    /**
+     * Создание предмета в DOM
+     * @param $slot
+     * @returns {jQuery|HTMLElement}
+     */
+    function createItemFromSlot($slot) {
+        var slotQtip = $slot.qtip('api');
         var $item = $('<div class="item ' + $slot.data('slots').split(',').join(' ') + '"></div>');
 
         $item.data('id', $slot.data('id'));
@@ -347,14 +387,7 @@ $(function () {
         });
 
         $inventory.find('.items-list').append($item);
-        $inventory.find('.paperdoll .slot').removeClass('highlight');
 
-        makeItemsDraggable();
-
-        Kingdom.Chat.addInfo('Ты снял ' + $item.data('name4'));
-
-        Kingdom.Websocket.command('remove', slotName);
-
-        ion.sound.play('remove-clothes');
+        return $item;
     }
 });

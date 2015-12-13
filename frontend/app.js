@@ -24,6 +24,15 @@ $(function () {
 
                     var data = JSON.parse(args[0]);
 
+                    if (data.waitstate) {
+                        Kingdom.Chat.addInfo({
+                            event: 'warning',
+                            message: 'Нужно отдохнуть еще ' + data.waitstate + ' ' + Kingdom.Chat.pluralize(data.waitstate, 'секунду', 'секунды', 'секунд')
+                        });
+
+                        return false;
+                    }
+
                     //TODO[Rottenwood]: Убрать блок обработки в новый файл (напр. commandHandler.js)
                     // Обработка результатов запрошенных команд
                     if (data.commandName == 'move') {
@@ -45,7 +54,9 @@ $(function () {
                     } else if (data.commandName == 'reloadPage') {
                         location.reload();
                     } else if (data.commandName == 'inventory') {
-                        Kingdom.Inventory.setItems(data.data);
+                        if (data.data) {
+                            Kingdom.Inventory.setItems(data.data);
+                        }
                     } else if (data.commandName == 'getMoney') {
                         Kingdom.Money.setMoney(data.data);
                     } else if (data.commandName == 'lookUser') {
@@ -59,10 +70,10 @@ $(function () {
                             Kingdom.Chat.addInfo('Ты рубишь дерево. Добыто древесины: ' + data.data.obtained);
                         }
 
-                        if (data.data.waitstate) {
+                        if (data.waitstate) {
                             Kingdom.Chat.addInfo({
                                 event: 'warning',
-                                message: 'Нужно отдохнуть. Ты сможешь добывать древесину через ' + data.data.waitstate + ' ' + Kingdom.Chat.pluralize(data.data.waitstate, 'секунду', 'секунды', 'секунд')
+                                message: 'Нужно отдохнуть. Ты сможешь добывать древесину через ' + data.waitstate + ' ' + Kingdom.Chat.pluralize(data.waitstate, 'секунду', 'секунды', 'секунд')
                             });
                         }
 
@@ -147,6 +158,7 @@ $(function () {
 
     var $gameContentRoom = $('#game-room');
     var $gameMap = $('#game-map');
+    var $gameLeftBox = $('#game-left-box');
 
     /**
      * Отрисовка карты
@@ -159,6 +171,8 @@ $(function () {
             $('.map .y' + room.y + ' .x' + room.x)
                 .html('<img src="/img/locations/' + room.pic + '.png">');
         });
+
+        $gameLeftBox.animate({opacity: 1}, "slow");
     }
 
     /**
@@ -170,6 +184,7 @@ $(function () {
     }
 
     /**
+     * //TODO[Rottenwood]: Убрать в модель Room
      * Отрисовка комнаты
      * @param roomData
      */
@@ -183,6 +198,8 @@ $(function () {
         $roomPlayers.html('');
         $roomControls.html('');
         $resourcesList.html('');
+
+        Kingdom.Room.setData(roomData);
 
         $roomName.html('').html(roomData.name + '<span class="coordinates">[' + roomData.x + '/' + roomData.y + ']</span>');
         $roomDescription.html('').html(roomData.description);
@@ -198,6 +215,7 @@ $(function () {
     }
 
     /**
+     * @Deprecated Удалить в v0.3.0
      * Обновление информации о доступных ресурсах в комнате
      * @param resourcesData
      */

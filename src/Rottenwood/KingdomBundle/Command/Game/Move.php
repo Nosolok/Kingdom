@@ -14,11 +14,20 @@ use Rottenwood\KingdomBundle\Redis\RedisClientInterface;
  */
 class Move extends AbstractGameCommand {
 
+    private $waitState = 5;
+
     /**
      * @return CommandResponse
      * @throws InvalidCommandParameter
      */
-    public function execute() {
+    public function execute(): CommandResponse {
+
+        if ($this->user->isBusy()) {
+            $this->result->setWaitstate($this->user->getWaitstate());
+
+            return $this->result;
+        }
+
         $roomRepository = $this->container->get('kingdom.room_repository');
         $em = $roomRepository->getEntityManager();
 
@@ -99,6 +108,8 @@ class Move extends AbstractGameCommand {
 
             $logger->info($logString);
             $this->result->setData($resultData);
+
+            $userService->addWaitstate($this->user, $this->waitState);
         }
 
         return $this->result;
@@ -109,7 +120,7 @@ class Move extends AbstractGameCommand {
      * @param Room $room
      * @return bool
      */
-    private function userCanWalkToRoom(Room $room) {
+    private function userCanWalkToRoom(Room $room): bool {
         return $room->getType()->userCanWalk();
     }
 }
